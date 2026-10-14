@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Split
 
-## Getting Started
+A shared-expense tracker for roommates and trips. Create groups, record who paid for what, and see who owes whom, with a minimal set of suggested payments to settle up.
 
-First, run the development server:
+Built with Next.js (App Router, JavaScript) and Supabase (PostgreSQL).
 
+## Features
+
+- Create people and groups
+- Add expenses, split equally between selected members
+- Balances per member, computed from expenses and settlements
+- Suggested payments that minimize the number of transfers
+- Record settlements with one click
+
+## Setup
+
+1. Clone the repo and install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+   npm install
 ```
+2. Create a Supabase project and run `schema.sql` in the SQL Editor.
+3. Create `.env.local` in the project root:
+```
+   NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=<your secret key>
+```
+   The secret key is only used in server-side route handlers. Never commit it.
+4. Start the dev server:
+```bash
+   npm run dev
+```
+   The app runs at http://localhost:3000.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Database
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+Tables: `users`, `groups`, `group_members`, `expenses`, `expense_splits`, `settlements`. The full schema is in `schema.sql`. Row Level Security is enabled on all tables with no policies, so all access goes through the API routes using the service role key.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## API
 
-## Learn More
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET, POST | `/api/users` | List users, create a user |
+| GET, POST | `/api/groups` | List groups with members, create a group |
+| GET, POST | `/api/expenses?groupId=` | List a group's expenses, add an expense |
+| GET, POST | `/api/settlements?groupId=` | List a group's settlements, record a payment |
+| GET | `/api/balances?groupId=` | Balances per member and suggested payments |
 
-To learn more about Next.js, take a look at the following resources:
+## Design decisions
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Money is stored as integer cents** to avoid floating-point rounding errors.
+- **Balances are computed, not stored**, so they can never get out of sync with the expenses and settlements.
+- **Equal splits distribute leftover cents**: 10.00 € between 3 people becomes 3.34 / 3.33 / 3.33, so the shares always add up exactly.
+- **Split validation happens in the API**: shares must sum to the expense amount, and the payer and participants must belong to the group.
+- **Settle-up uses greedy matching**: the biggest debtor pays the biggest creditor, repeated until everyone is at zero (`lib/balances.js`).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Possible future work
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Authentication with Supabase Auth
+- Custom and percentage-based splits in the UI
+- Deleting expenses, adding members to existing groups
+- Settlement history view
